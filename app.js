@@ -1,12 +1,21 @@
 import "dotenv/config";
 import express from "express";
-import { getUsers, saveUsers } from "./database/users.js";
 import logger from "./middleware/logger.js";
 import errorHandle from "./middleware/errorHandle.js";
 
 import {
+  findAllUsers,
+  findUserById,
+  findUserByEmail,
+  createUser,
+  updateUser,
+  deleteUser,
+} from "./services/userService.js";
+
+import {
   validateCreateUser,
   validateUpdateUser,
+  validateUserId,
 } from "./validations/userValidation.js";
 
 const PORT = process.env.PORT || 3000;
@@ -23,16 +32,14 @@ app.use(logger);
 // Obtener todos los usuarios
 // ============================================================
 
-app.get("/users", (req, res) => {
-  getUsers((err, users) => {
-    if (err) {
-      return res.status(500).json({
-        error: "Error con la conexión de datos",
-      });
-    }
+app.get("/users", async (req, res, next) => {
+  try {
+    const users = await findAllUsers();
 
     res.json(users);
-  });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================
@@ -40,17 +47,19 @@ app.get("/users", (req, res) => {
 // Obtener un usuario por ID
 // ============================================================
 
-app.get("/users/:id", (req, res) => {
+app.get("/users/:id", async (req, res, next) => {
   const userId = Number(req.params.id);
 
-  getUsers((err, users) => {
-    if (err) {
-      return res.status(500).json({
-        error: "Error con la conexión de datos",
-      });
-    }
+  const idValidation = validateUserId(userId);
 
-    const user = users.find((user) => user.id === userId);
+  if (!idValidation.valid) {
+    return res.status(400).json({
+      error: idValidation.error,
+    });
+  }
+
+  try {
+    const user = await findUserById(userId);
 
     if (!user) {
       return res.status(404).json({
@@ -59,7 +68,9 @@ app.get("/users/:id", (req, res) => {
     }
 
     res.json(user);
-  });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================
@@ -67,7 +78,7 @@ app.get("/users/:id", (req, res) => {
 // Crear un usuario
 // ============================================================
 
-app.post("/users", (req, res) => {
+app.post("/users", async (req, res, next) => {
   const newUser = req.body;
 
   const validation = validateCreateUser(newUser);
@@ -78,14 +89,8 @@ app.post("/users", (req, res) => {
     });
   }
 
-  getUsers((err, users) => {
-    if (err) {
-      return res.status(500).json({
-        error: "Error con la conexión de datos",
-      });
-    }
-
-    const userExists = users.find((user) => user.id === newUser.id);
+  try {
+    const userExists = await findUserByEmail(newUser.email);
 
     if (userExists) {
       return res.status(409).json({
@@ -93,21 +98,15 @@ app.post("/users", (req, res) => {
       });
     }
 
-    users.push(newUser);
+    const user = await createUser(newUser);
 
-    saveUsers(users, (err) => {
-      if (err) {
-        return res.status(500).json({
-          error: "Error al guardar el usuario",
-        });
-      }
-
-      res.status(201).json({
-        message: "Usuario creado correctamente",
-        user: newUser,
-      });
+    res.status(201).json({
+      message: "Usuario creado correctamente",
+      user,
     });
-  });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================
@@ -115,15 +114,18 @@ app.post("/users", (req, res) => {
 // Actualizar un usuario
 // ============================================================
 
-app.put("/users/:id", (req, res) => {
+app.put("/users/:id", async (req, res, next) => {
   const userId = Number(req.params.id);
 
-  const updatedUser = {
-    id: userId,
-    ...req.body,
-  };
+  const idValidation = validateUserId(userId);
 
-  const validation = validateUpdateUser(updatedUser);
+  if (!idValidation.valid) {
+    return res.status(400).json({
+      error: idValidation.error,
+    });
+  }
+
+  const validation = validateUpdateUser(req.body);
 
   if (!validation.valid) {
     return res.status(400).json({
@@ -131,36 +133,24 @@ app.put("/users/:id", (req, res) => {
     });
   }
 
-  getUsers((err, users) => {
-    if (err) {
-      return res.status(500).json({
-        error: "Error con la conexión de datos",
-      });
-    }
+  try {
+    const existingUser = await findUserById(userId);
 
-    const userIndex = users.findIndex((user) => user.id === userId);
-
-    if (userIndex === -1) {
+    if (!existingUser) {
       return res.status(404).json({
         error: "Usuario no encontrado",
       });
     }
 
-    users[userIndex] = updatedUser;
+    const user = await updateUser(userId, req.body);
 
-    saveUsers(users, (err) => {
-      if (err) {
-        return res.status(500).json({
-          error: "Error al actualizar el usuario",
-        });
-      }
-
-      res.json({
-        message: "Usuario actualizado correctamente",
-        user: updatedUser,
-      });
+    res.json({
+      message: "Usuario actualizado correctamente",
+      user,
     });
-  });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================
@@ -168,40 +158,35 @@ app.put("/users/:id", (req, res) => {
 // Eliminar un usuario
 // ============================================================
 
-app.delete("/users/:id", (req, res) => {
+app.delete("/users/:id", async (req, res, next) => {
   const userId = Number(req.params.id);
 
-  getUsers((err, users) => {
-    if (err) {
-      return res.status(500).json({
-        error: "Error con la conexión de datos",
-      });
-    }
+  const idValidation = validateUserId(userId);
 
-    const userIndex = users.findIndex((user) => user.id === userId);
+  if (!idValidation.valid) {
+    return res.status(400).json({
+      error: idValidation.error,
+    });
+  }
 
-    if (userIndex === -1) {
+  try {
+    const existingUser = await findUserById(userId);
+
+    if (!existingUser) {
       return res.status(404).json({
         error: "Usuario no encontrado",
       });
     }
 
-    // Eliminar usuariov y devuelve el que elimino para mostrarlo al usuario.
-    const deletedUser = users.splice(userIndex, 1)[0];
+    const deletedUser = await deleteUser(userId);
 
-    saveUsers(users, (err) => {
-      if (err) {
-        return res.status(500).json({
-          error: "Error al eliminar el usuario",
-        });
-      }
-
-      res.json({
-        message: "Usuario eliminado correctamente",
-        user: deletedUser,
-      });
+    res.json({
+      message: "Usuario eliminado correctamente",
+      user: deletedUser,
     });
-  });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/error", (req, res, next) => {

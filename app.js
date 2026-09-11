@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import logger from "./middleware/logger.js";
 import errorHandle from "./middleware/errorHandle.js";
+import auth from "./middleware/auth.js";
 
 import {
   findAllUsers,
@@ -191,6 +192,18 @@ app.delete("/users/:id", async (req, res, next) => {
 
 app.get("/error", (req, res, next) => {
   next(new Error("Error intencional"));
+});
+
+// ============================================================
+// GET /protected-route
+// Ruta de prueba: solo accesible con un token válido
+// ============================================================
+
+app.get("/protected-route", auth, (req, res) => {
+  res.json({
+    message: "Accediste a una ruta protegida",
+    user: req.user,
+  });
 });
 
 // Middleware de errores

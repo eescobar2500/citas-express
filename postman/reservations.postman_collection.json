@@ -1,0 +1,360 @@
+{
+  "info": {
+    "name": "Curso Express JS - Reservations",
+    "description": "Endpoints de reservas del curso de Express + Prisma.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Reservations",
+      "description": "Endpoints de reservas (Appointment). Todos requieren Bearer token: corré Auth > Login primero para poblar la variable {{token}}.",
+      "item": [
+        {
+          "name": "Login (obtener token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el token en la variable de entorno para el resto de la carpeta",
+                  "pm.test(\"Login exitoso\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "if (body.token) {",
+                  "    pm.environment.set(\"token\", body.token);",
+                  "    console.log(\"Token guardado\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Helper: no es un endpoint de reservations, pero deja el {{token}} listo."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear reserva",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "// Guarda el id para usarlo en Obtener / Actualizar",
+                  "if (body.reservation && body.reservation.id) {",
+                  "    pm.environment.set(\"reservationId\", body.reservation.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-09-15T00:00:00.000Z\",\n  \"timeBlockId\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations"
+              ]
+            },
+            "description": "POST /api/reservations\n\nCrea una reserva para el usuario del token (el userId NO se manda en el body).\n\nBody:\n- date (obligatorio): fecha ISO válida\n- timeBlockId (obligatorio): entero positivo, debe existir\n\nRespuestas:\n- 201: reserva creada\n- 400: falta date o timeBlockId, o formato inválido\n- 401: sin token o token inválido\n- 404: el bloque horario no existe\n- 409: ese bloque ya está reservado en esa fecha"
+          },
+          "response": []
+        },
+        {
+          "name": "Listar mis reservas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Devuelve total y reservations\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"total\");",
+                  "    pm.expect(body.reservations).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations"
+              ]
+            },
+            "description": "GET /api/reservations\n\nDevuelve todas las reservas del usuario autenticado, ordenadas por fecha ascendente.\n\nRespuesta: { total, reservations: [...] }\n\n- 200: ok\n- 401: sin token o token inválido"
+          },
+          "response": []
+        },
+        {
+          "name": "Listar mis reservas (filtrar por fecha)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Incluye la fecha filtrada\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"date\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations?date=2026-09-15",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-09-15",
+                  "description": "YYYY-MM-DD. Filtra las reservas de ese día (rango UTC 00:00 a 00:00 del día siguiente)."
+                }
+              ]
+            },
+            "description": "GET /api/reservations?date=YYYY-MM-DD\n\nMismo endpoint que el anterior, acotado a un día.\n\nRespuesta: { date, total, reservations: [...] }\n\n- 200: ok\n- 400: la fecha no tiene un formato válido\n- 401: sin token o token inválido"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener reserva por id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"No expone userId ni password\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.not.have.property(\"userId\");",
+                  "    pm.expect(body.user).to.not.have.property(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "{{reservationId}}"
+              ]
+            },
+            "description": "GET /api/reservations/:id\n\nDevuelve una reserva. Solo el dueño o un ADMIN pueden verla.\n\n- 200: ok\n- 400: el id no es un entero positivo\n- 401: sin token o token inválido\n- 403: la reserva es de otro usuario y no sos ADMIN\n- 404: no existe"
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar reserva",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-09-16T00:00:00.000Z\",\n  \"timeBlockId\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "{{reservationId}}"
+              ]
+            },
+            "description": "PUT /api/reservations/:id\n\nActualización parcial: podés mandar date, timeBlockId, o ambos. Los campos ausentes conservan su valor.\n\nSolo el dueño o un ADMIN pueden actualizarla.\n\n- 200: actualizada\n- 400: id inválido, body vacío, o formato inválido\n- 401: sin token o token inválido\n- 403: la reserva es de otro usuario y no sos ADMIN\n- 404: no existe la reserva o el bloque horario\n- 409: el nuevo slot ya está reservado"
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar reserva (solo timeBlockId)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"timeBlockId\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reservations",
+                "{{reservationId}}"
+              ]
+            },
+            "description": "Ejemplo de update parcial: cambia solo el bloque horario y mantiene la fecha actual."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "userEmail",
+      "value": "user@example.com",
+      "type": "string"
+    },
+    {
+      "key": "userPassword",
+      "value": "password123",
+      "type": "string"
+    },
+    {
+      "key": "reservationId",
+      "value": "1",
+      "type": "string"
+    }
+  ]
+}

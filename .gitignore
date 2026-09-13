@@ -146,4 +146,7 @@ dist
 .cursor/
 .devin/
 
+# Prisma Client: se genera con `prisma generate`, no se versiona
+src/generated/
+
 # End of https://www.toptal.com/developers/gitignore/api/node

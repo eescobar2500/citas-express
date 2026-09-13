@@ -1,4 +1,7 @@
+import bcrypt from "bcrypt";
 import prisma from "../database/prisma.js";
+
+const SALT_ROUNDS = 10;
 
 // Campos que se devuelven al cliente (nunca el password)
 const userSelect = {
@@ -29,11 +32,38 @@ export function findUserByEmail(email) {
   });
 }
 
+// Uso exclusivo del login: es el único método que expone el hash.
+// No devolver su resultado directamente en una respuesta HTTP.
+export function findUserByEmailWithPassword(email) {
+  return prisma.user.findUnique({
+    where: { email },
+  });
+}
+
 export function createUser({ name, email, password, role }) {
   return prisma.user.create({
     data: { name, email, password, role },
     select: userSelect,
   });
+}
+
+// Registra un usuario guardando la contraseña hasheada, nunca en texto plano
+export async function registerUser({ name, email, password, role }) {
+  const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+  return prisma.user.create({
+    data: {
+      name,
+      email,
+      password: hashedPassword,
+      role,
+    },
+    select: userSelect,
+  });
+}
+
+export function verifyPassword(plainPassword, hashedPassword) {
+  return bcrypt.compare(plainPassword, hashedPassword);
 }
 
 export function updateUser(id, { name, email, password, role }) {

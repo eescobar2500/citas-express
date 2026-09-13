@@ -1,0 +1,13 @@
+# Normaliza los finales de línea a LF en el repositorio.
+# El proyecto se trabaja desde Windows y WSL a la vez, y sin esta regla
+# cada entorno reescribe los mismos archivos con finales distintos.
+# LF es además lo que corre en el contenedor de Railway.
+* text=auto eol=lf
+
+# Binarios: no tocar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
